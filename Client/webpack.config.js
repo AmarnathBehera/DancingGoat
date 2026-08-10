@@ -3,8 +3,8 @@ const baseWebpackConfig = require('@kentico/xperience-webpack-config');
 
 module.exports = (webpackConfigEnv, argv) => {
     const baseConfig = baseWebpackConfig({
-        orgName: '',
-        projectName: '',
+        orgName: 'dancing-goat',
+        projectName: 'reporting',
         webpackConfigEnv,
         argv
     });

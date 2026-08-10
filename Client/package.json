@@ -1,5 +1,5 @@
 {
-  "name": "dancing-goat-admin",
+  "name": "@dancing-goat/reporting",
   "version": "1.0.0",
   "description": "Dancing Goat Xperience administration client module.",
   "private": true,

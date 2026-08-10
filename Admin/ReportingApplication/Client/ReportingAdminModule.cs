@@ -17,7 +17,7 @@ namespace DancingGoat.Admin.ReportingApplication.Client
         {
             base.OnInit();
 
-            RegisterClientModule(string.Empty, string.Empty);
+            RegisterClientModule("dancing-goat", "reporting");
         }
     }
 }

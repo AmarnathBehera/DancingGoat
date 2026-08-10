@@ -5,7 +5,7 @@
     <UserSecretsId>79c858af-5444-4954-8d08-6592a961e82a</UserSecretsId>
     <SeparatedAdmin Condition="'$(SeparatedAdmin)' == ''">false</SeparatedAdmin>
     <NoWarn>$(NoWarn);KXE0004;KXE0006</NoWarn>
-    <AdminOrgName></AdminOrgName>
+    <AdminOrgName>dancing-goat</AdminOrgName>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
   </PropertyGroup>
   <ItemGroup>
@@ -19,7 +19,7 @@
   </ItemGroup>
   <ItemGroup>
     <AdminClientPath Include="Client\dist\**">
-      <ProjectName></ProjectName>
+      <ProjectName>reporting</ProjectName>
     </AdminClientPath>
   </ItemGroup>
   <ItemGroup>
