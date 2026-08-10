@@ -1,4 +1,4 @@
-﻿import React, { RefObject, useState } from 'react';
+import React, { RefObject, useState } from 'react';
 import {
     BarItemDraggable,
     BarItemGroup,
@@ -43,7 +43,7 @@ interface EditQueryClientProperties {
     reportingChannelSettingId: number;
 }
 
-export const EditQueryTemplate = (props: EditQueryClientProperties) => {
+export const EditQuery = (props: EditQueryClientProperties) => {
     const { executeCommand } = usePageCommandProvider();
 
     const textAreaRef = React.createRef<HTMLTextAreaElement>();
@@ -368,4 +368,6 @@ WHERE ChannelID = ${ props.reportingChannelSettingId }
     );
 };
 
-export default EditQueryTemplate;
+export const EditQueryTemplate = EditQuery;
+
+export default EditQuery;

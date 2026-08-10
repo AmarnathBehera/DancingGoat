@@ -1,4 +1,4 @@
-﻿using CMS.DataEngine;
+using CMS.DataEngine;
 using CMS.Membership;
 using DancingGoat;
 using DancingGoat.Admin.ReportingApplication;
@@ -22,7 +22,7 @@ using System.Threading.Tasks;
     slug: "queries",
     uiPageType: typeof(EditQuery),
     name: "Queries",
-    templateName: "@/EditQuery",
+    templateName: "@dancing-goat/reporting/EditQuery",
     order: UIPageOrder.First)]
 
 //// Register full-screen editor page so IPageLinkGenerator can resolve EditQueryPage
@@ -32,7 +32,7 @@ using System.Threading.Tasks;
 //    uiPageType: typeof(EditQueryPage),
 //    name: "Edit Query (Full screen)",
 //    // Use the same client template as the existing EditQuery page so the SQL editor UI renders
-//    templateName: "@/EditQuery",
+//    templateName: "@dancing-goat/reporting/EditQuery",
 //    order: UIPageOrder.NoOrder)]
 
 [assembly: UIPage(
