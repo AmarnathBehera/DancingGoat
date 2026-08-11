@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace DancingGoat
@@ -60,20 +61,33 @@ WHERE ChannelID = {ReportingChannelSettingId}
             Task.FromResult(Response().AddSuccessMessage(message));
 
         [PageCommand]
-        public Task<ICommandResponse> RunSql(string query)
+        public Task<ICommandResponse<SqlBrowserQueryResult>> RunSql(string query)
         {
-            sqlBrowserResultProvider.SetQuery(query);
-
-            var parameters = new PageParameterValues
+            if (string.IsNullOrWhiteSpace(query))
             {
-                { typeof(ReportingApplicationChannelSettingsEditSection), ReportingChannelSettingId }
-            };
+                return Task.FromResult(
+                    ResponseFrom(new SqlBrowserQueryResult
+                    {
+                        ErrorMessage = "No query entered."
+                    })
+                        .AddErrorMessage("No query entered."));
+            }
 
-            string navigationUrl =
-                pageLinkGenerator.GetPath<ResultListing>(parameters);
+            sqlBrowserResultProvider.SetQuery(query);
+            var result = sqlBrowserResultProvider.GetQueryResult();
 
-            return Task.FromResult(
-                (ICommandResponse)NavigateTo(navigationUrl));
+            if (string.IsNullOrWhiteSpace(result.ErrorMessage))
+            {
+                result.AutoSavedQuery = AutoSaveQuery(query);
+            }
+
+            var response = ResponseFrom(result);
+            if (!string.IsNullOrWhiteSpace(result.ErrorMessage))
+            {
+                return Task.FromResult(response.AddErrorMessage(result.ErrorMessage));
+            }
+
+            return Task.FromResult(response.AddSuccessMessage("Query executed."));
         }
 
         [PageCommand]
@@ -125,6 +139,8 @@ WHERE ChannelID = {ReportingChannelSettingId}
                 var newQuery = new ReportingReportInfo
                 {
                     ReportingReportDisplayName = query.Name,
+                    ReportingReportCodeName = GenerateQueryCodeName(query.Name),
+                    ReportingReportChannelSettingsID = ReportingChannelSettingId,
                     ReportingReportQuery = query.Text
                 };
 
@@ -174,6 +190,49 @@ WHERE ChannelID = {ReportingChannelSettingId}
 
             return ResponseFrom(true);
         }
+
+        private SavedQuery? AutoSaveQuery(string query)
+        {
+            try
+            {
+                string displayName = $"Query {DateTime.Now:yyyyMMdd HHmmss}";
+                var savedQuery = new ReportingReportInfo
+                {
+                    ReportingReportDisplayName = displayName,
+                    ReportingReportCodeName = GenerateQueryCodeName(displayName),
+                    ReportingReportChannelSettingsID = ReportingChannelSettingId,
+                    ReportingReportQuery = query
+                };
+
+                savedQuery.Insert();
+
+                return new SavedQuery(savedQuery);
+            }
+            catch (Exception ex)
+            {
+                eventLogService.LogException(
+                    nameof(EditQuery),
+                    nameof(AutoSaveQuery),
+                    ex);
+
+                return null;
+            }
+        }
+
+
+        private static string GenerateQueryCodeName(string displayName)
+        {
+            string codeName = Regex.Replace(displayName, "[^a-zA-Z0-9_.-]", "_");
+            codeName = codeName.Trim('.');
+
+            if (string.IsNullOrWhiteSpace(codeName))
+            {
+                codeName = "Query";
+            }
+
+            return $"{codeName}_{Guid.NewGuid():N}";
+        }
+
 
         private Task<IEnumerable<ReportingReportInfo>> GetSavedQueries() =>
             savedQueryProvider.Get()
