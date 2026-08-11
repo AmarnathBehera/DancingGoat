@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace DancingGoat
@@ -60,20 +61,67 @@ WHERE ChannelID = {ReportingChannelSettingId}
             Task.FromResult(Response().AddSuccessMessage(message));
 
         [PageCommand]
-        public Task<ICommandResponse> RunSql(string query)
+        public Task<ICommandResponse<SqlBrowserQueryResult>> RunSql(string query)
         {
-            sqlBrowserResultProvider.SetQuery(query);
-
-            var parameters = new PageParameterValues
+            if (string.IsNullOrWhiteSpace(query))
             {
-                { typeof(ReportingApplicationChannelSettingsEditSection), ReportingChannelSettingId }
-            };
+                return Task.FromResult(
+                    ResponseFrom(new SqlBrowserQueryResult
+                    {
+                        ErrorMessage = "No query entered."
+                    })
+                        .AddErrorMessage("No query entered."));
+            }
 
-            string navigationUrl =
-                pageLinkGenerator.GetPath<ResultListing>(parameters);
+            sqlBrowserResultProvider.SetQuery(query);
+            var result = sqlBrowserResultProvider.GetQueryResult();
+
+            if (string.IsNullOrWhiteSpace(result.ErrorMessage))
+            {
+                result.AutoSavedQuery = AutoSaveQuery(query);
+            }
+
+            var response = ResponseFrom(result);
+            if (!string.IsNullOrWhiteSpace(result.ErrorMessage))
+            {
+                return Task.FromResult(response.AddErrorMessage(result.ErrorMessage));
+            }
+
+            return Task.FromResult(response.AddSuccessMessage("Query executed."));
+        }
+
+        [PageCommand]
+        public Task<ICommandResponse<SavedQuery?>> RenameQuery(SavedQuery query)
+        {
+            if (query.ID <= 0 || string.IsNullOrWhiteSpace(query.Name))
+            {
+                return Task.FromResult(
+                    ResponseFrom<SavedQuery?>(null)
+                        .AddErrorMessage("Received empty parameter"));
+            }
+
+            var savedQuery = savedQueryProvider.Get()
+                .TopN(1)
+                .WhereEquals(nameof(ReportingReportInfo.ReportingReportID), query.ID)
+                .WhereEquals(nameof(ReportingReportInfo.ReportingReportChannelSettingsID), ReportingChannelSettingId)
+                .FirstOrDefault();
+
+            if (savedQuery is null)
+            {
+                return Task.FromResult(
+                    ResponseFrom<SavedQuery?>(null)
+                        .AddErrorMessage($"Query {query.ID} not found"));
+            }
+
+            savedQuery.ReportingReportDisplayName = query.Name;
+            savedQuery.ReportingReportCodeName = GenerateQueryCodeName(query.Name);
+            savedQuery.Update();
+
+            query.Text = savedQuery.ReportingReportQuery;
 
             return Task.FromResult(
-                (ICommandResponse)NavigateTo(navigationUrl));
+                ResponseFrom<SavedQuery?>(query)
+                    .AddSuccessMessage("Query renamed!"));
         }
 
         [PageCommand]
@@ -82,6 +130,7 @@ WHERE ChannelID = {ReportingChannelSettingId}
             var query = savedQueryProvider.Get()
                 .TopN(1)
                 .WhereEquals(nameof(ReportingReportInfo.ReportingReportID), id)
+                .WhereEquals(nameof(ReportingReportInfo.ReportingReportChannelSettingsID), ReportingChannelSettingId)
                 .FirstOrDefault();
 
             if (query is null)
@@ -125,7 +174,11 @@ WHERE ChannelID = {ReportingChannelSettingId}
                 var newQuery = new ReportingReportInfo
                 {
                     ReportingReportDisplayName = query.Name,
-                    ReportingReportQuery = query.Text
+                    ReportingReportCodeName = GenerateQueryCodeName(query.Name),
+                    ReportingReportDescription = string.Empty,
+                    ReportingReportChannelSettingsID = ReportingChannelSettingId,
+                    ReportingReportQuery = query.Text,
+                    ReportingReportGUID = Guid.NewGuid()
                 };
 
                 newQuery.Insert();
@@ -175,8 +228,54 @@ WHERE ChannelID = {ReportingChannelSettingId}
             return ResponseFrom(true);
         }
 
+        private SavedQuery? AutoSaveQuery(string query)
+        {
+            try
+            {
+                string displayName = $"Query {DateTime.Now:yyyyMMdd HHmmss}";
+                var savedQuery = new ReportingReportInfo
+                {
+                    ReportingReportDisplayName = displayName,
+                    ReportingReportCodeName = GenerateQueryCodeName(displayName),
+                    ReportingReportDescription = string.Empty,
+                    ReportingReportChannelSettingsID = ReportingChannelSettingId,
+                    ReportingReportQuery = query,
+                    ReportingReportGUID = Guid.NewGuid()
+                };
+
+                savedQuery.Insert();
+
+                return new SavedQuery(savedQuery);
+            }
+            catch (Exception ex)
+            {
+                eventLogService.LogException(
+                    nameof(EditQuery),
+                    nameof(AutoSaveQuery),
+                    ex);
+
+                return null;
+            }
+        }
+
+
+        private static string GenerateQueryCodeName(string displayName)
+        {
+            string codeName = Regex.Replace(displayName, "[^a-zA-Z0-9_.-]", "_");
+            codeName = codeName.Trim('.');
+
+            if (string.IsNullOrWhiteSpace(codeName))
+            {
+                codeName = "Query";
+            }
+
+            return $"{codeName}_{Guid.NewGuid():N}";
+        }
+
+
         private Task<IEnumerable<ReportingReportInfo>> GetSavedQueries() =>
             savedQueryProvider.Get()
+                .WhereEquals(nameof(ReportingReportInfo.ReportingReportChannelSettingsID), ReportingChannelSettingId)
                 .GetEnumerableTypedResultAsync();
 
         private IEnumerable<DatabaseTable> LoadTables(CacheSettings cs)

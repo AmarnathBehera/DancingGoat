@@ -20,12 +20,16 @@ module.exports = (webpackConfigEnv, argv) => {
             ]
         },
         output: {
-            clean: true
+            clean: true,
+            filename: 'entry.js'
+        },
+        optimization: {
+            minimize: false
         },
         devServer: {
             port: 3070
         }
     };
 
-    return webpackMerge.merge(projectConfig, baseConfig);
+    return webpackMerge.merge(baseConfig, projectConfig);
 };
