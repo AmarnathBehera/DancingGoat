@@ -2,7 +2,7 @@
 using CMS.DataEngine;
 using CMS.Helpers;
 using CMS.Membership;
-using DancingGoat.Admin.ReportingApplication;
+using DancingGoat.Enum;
 using Kentico.Xperience.Admin.Base;
 using System;
 using System.Collections.Generic;
@@ -22,6 +22,7 @@ namespace DancingGoat
         IEventLogService eventLogService,
         IProgressiveCache cache,
         ISqlBrowserResultProvider sqlBrowserResultProvider,
+        ISqlBrowserExporter sqlBrowserExporter,       // <-- added exporter
         IPageLinkGenerator pageLinkGenerator,
         IInfoProvider<ReportingReportInfo> savedQueryProvider)
         : Page<EditSqlTemplateClientProperties>
@@ -31,20 +32,21 @@ namespace DancingGoat
 
         public override async Task<EditSqlTemplateClientProperties> ConfigureTemplateProperties(EditSqlTemplateClientProperties properties)
         {
-            properties.Tables = cache.Load(
-                LoadTables,
-                new CacheSettings(
-                    10,
-                    $"{nameof(EditQuery)}|{nameof(ConfigureTemplateProperties)}"));
+            //properties.Tables = cache.Load(
+            //    LoadTables,
+            //    new CacheSettings(
+            //        10,
+            //        $"{nameof(EditQuery)}|{nameof(ConfigureTemplateProperties)}"));
 
             var query = sqlBrowserResultProvider.GetQuery();
 
             if (string.IsNullOrWhiteSpace(query))
             {
                 query = $"""
-SELECT *
-FROM View_CMS_Tree_Joined
-WHERE ChannelID = {ReportingChannelSettingId}
+/*
+No query has been configured.
+Use ChannelID = {ReportingChannelSettingId} in your custom query.
+*/
 """;
             }
 
@@ -76,10 +78,10 @@ WHERE ChannelID = {ReportingChannelSettingId}
             sqlBrowserResultProvider.SetQuery(query);
             var result = sqlBrowserResultProvider.GetQueryResult();
 
-            if (string.IsNullOrWhiteSpace(result.ErrorMessage))
-            {
-                result.AutoSavedQuery = AutoSaveQuery(query);
-            }
+            //if (string.IsNullOrWhiteSpace(result.ErrorMessage))
+            //{
+            //    result.AutoSavedQuery = AutoSaveQuery(query);
+            //}
 
             var response = ResponseFrom(result);
             if (!string.IsNullOrWhiteSpace(result.ErrorMessage))
@@ -228,35 +230,35 @@ WHERE ChannelID = {ReportingChannelSettingId}
             return ResponseFrom(true);
         }
 
-        private SavedQuery? AutoSaveQuery(string query)
-        {
-            try
-            {
-                string displayName = $"Query {DateTime.Now:yyyyMMdd HHmmss}";
-                var savedQuery = new ReportingReportInfo
-                {
-                    ReportingReportDisplayName = displayName,
-                    ReportingReportCodeName = GenerateQueryCodeName(displayName),
-                    ReportingReportDescription = string.Empty,
-                    ReportingReportChannelSettingsID = ReportingChannelSettingId,
-                    ReportingReportQuery = query,
-                    ReportingReportGUID = Guid.NewGuid()
-                };
+        //private SavedQuery? AutoSaveQuery(string query)
+        //{
+        //    try
+        //    {
+        //        string displayName = $"Query {DateTime.Now:yyyyMMdd HHmmss}";
+        //        var savedQuery = new ReportingReportInfo
+        //        {
+        //            ReportingReportDisplayName = displayName,
+        //            ReportingReportCodeName = GenerateQueryCodeName(displayName),
+        //            ReportingReportDescription = string.Empty,
+        //            ReportingReportChannelSettingsID = ReportingChannelSettingId,
+        //            ReportingReportQuery = query,
+        //            ReportingReportGUID = Guid.NewGuid()
+        //        };
 
-                savedQuery.Insert();
+        //        savedQuery.Insert();
 
-                return new SavedQuery(savedQuery);
-            }
-            catch (Exception ex)
-            {
-                eventLogService.LogException(
-                    nameof(EditQuery),
-                    nameof(AutoSaveQuery),
-                    ex);
+        //        return new SavedQuery(savedQuery);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        eventLogService.LogException(
+        //            nameof(EditQuery),
+        //            nameof(AutoSaveQuery),
+        //            ex);
 
-                return null;
-            }
-        }
+        //        return null;
+        //    }
+        //}
 
 
         private static string GenerateQueryCodeName(string displayName)
@@ -326,5 +328,44 @@ ORDER BY T.name ASC";
                 return [];
             }
         }
+
+
+
+        // Add this PageCommand method:
+        [PageCommand]
+        public async Task<ICommandResponse<string>> ExportQuery(ExportConfirmationDialogModel model)
+        {
+            try
+            {
+                var exportType = (model?.ExportType ?? "csv").ToLower() switch
+                {
+                    "csv" => SqlBrowserExportType.Csv,
+                    "excel" => SqlBrowserExportType.Excel,
+                    "json" => SqlBrowserExportType.Json,
+                    _ => SqlBrowserExportType.Csv
+                };
+
+                // If user didn't provide filename, generate one
+                var fileName = string.IsNullOrWhiteSpace(model?.FileName)
+                    ? $"export-{DateTime.Now:yyyy-MM-dd-HH-mm-ss}.{(exportType == SqlBrowserExportType.Excel ? "xlsx" : exportType == SqlBrowserExportType.Json ? "json" : "csv")}"
+                    : model.FileName;
+
+                var exportedPath = await sqlBrowserExporter.Export(exportType, fileName);
+
+                if (!string.IsNullOrEmpty(exportedPath))
+                {
+                    return ResponseFrom(exportedPath).AddSuccessMessage($"Exported results to {exportedPath}");
+                }
+
+                return ResponseFrom<string>(string.Empty).AddErrorMessage("Export failed, please check the Event log for details.");
+            }
+            catch (Exception ex)
+            {
+                eventLogService.LogException(nameof(EditQuery), nameof(ExportQuery), ex);
+                return ResponseFrom<string>(string.Empty).AddErrorMessage("Export failed, see event log.");
+            }
+        }
+
+
     }
 }

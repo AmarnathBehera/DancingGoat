@@ -18,6 +18,8 @@ namespace DancingGoat
     [UIEvaluatePermission(SystemPermissions.VIEW)]
     public class ViewRecord(IFormDataBinder formDataBinder, ISqlBrowserResultProvider sqlBrowserResultProvider) : EditPageBase(formDataBinder)
     {
+        [PageParameter(typeof(IntPageModelBinder))]
+        public int ReportingChannelSettingId { get; set; }
         private const string EOL_REPLACEMENT = "#EOL#";
         private readonly Regex newLineRegex = RegexHelper.GetRegex(@"(<br[ ]?/>)|([\r]?\n)");
 

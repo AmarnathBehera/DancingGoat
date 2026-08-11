@@ -18,6 +18,8 @@ namespace DancingGoat
     [UIEvaluatePermission(SystemPermissions.VIEW)]
     public class ExportListing(ISqlBrowserExporter sqlBrowserExporter) : DataContainerListingPage
     {
+        [PageParameter(typeof(IntPageModelBinder))]
+        public int ReportingChannelSettingId { get; set; }
         private const string FILESIZE_COLUMN = "filesize";
         private const string ROW_IDENTIFIER_COLUMN = "export_filename";
 

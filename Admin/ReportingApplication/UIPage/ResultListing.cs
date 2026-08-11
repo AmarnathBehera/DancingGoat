@@ -1,5 +1,6 @@
 ﻿using CMS.Base;
 using CMS.Core;
+using CMS.DataEngine;
 using CMS.Helpers;
 using CMS.Membership;
 using DancingGoat.Admin.ReportingApplication;
@@ -9,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+
 
 namespace DancingGoat
 {
@@ -24,45 +26,20 @@ namespace DancingGoat
     ISqlBrowserExporter sqlBrowserExporter,
     IEventLogService eventLogService,
     IUIPermissionEvaluator permissionEvaluator,
-    IPageLinkGenerator pageLinkGenerator) : DataContainerListingPage
+    IPageLinkGenerator pageLinkGenerator,
+    IInfoProvider<ReportingReportInfo> savedQueryProvider) : DataContainerListingPage
     {
         [PageParameter(typeof(IntPageModelBinder))]
         public int ReportingChannelSettingId { get; set; }
         public override async Task ConfigurePage()
         {
             // If no query is set, expose a header action to let the user enter one and show the "No results" callout.
-            var currentQuery = sqlBrowserQueryProvider.GetQuery();
-            if (string.IsNullOrEmpty(currentQuery))
-            {
-                // Open the full editor so the user can enter SQL in a dedicated window.
-                // Use OpenEditQuery which navigates to the EditQuery page (provides editor, execute, save/delete).
-                PageConfiguration.HeaderActions.AddCommand(
-                    "Enter query",
-                    nameof(OpenEditQuery),
-                    "Open SQL editor to compose and run a query for the current channel");
-
-                // Provide a quick navigation back to the channel list instead of opening the channel selector
-                PageConfiguration.HeaderActions.AddCommandWithConfirmation(
-                    "Back to channel",
-                    nameof(BackToChannel),
-                    "Return to channel list",
-                    "Back");
-
-
-                PageConfiguration.Callouts = [
-                    new CalloutConfiguration
-                {
-                    Headline = "No results",
-                    Content = "Query result has no data, please check the Event log for errors or modify your query",
-                    Placement = CalloutPlacement.OnPaper,
-                    Type = CalloutType.FriendlyWarning
-                }];
-
-                await base.ConfigurePage();
-                return;
-            }
-
-            int recordCount = sqlBrowserQueryProvider.GetTotalRecordCount();
+            // Open the full editor so the user can enter SQL in a dedicated window.
+            // Use OpenEditQuery which navigates to the EditQuery page (provides editor, execute, save/delete).
+            PageConfiguration.HeaderActions.AddCommand(
+                "Enter query",
+                nameof(OpenEditQuery),
+                "Open SQL editor to compose and run a query for the current channel");
 
             // Provide a quick navigation back to the channel list instead of opening the channel selector
             PageConfiguration.HeaderActions.AddCommandWithConfirmation(
@@ -71,7 +48,78 @@ namespace DancingGoat
                 "Return to channel list",
                 "Back");
 
+            PageConfiguration.Callouts = [
+       new CalloutConfiguration
+                {
+                    Headline = "No results",
+                    Content = "Query result has no data, please check the Event log for errors or modify your query",
+                    Placement = CalloutPlacement.OnPaper,
+                    Type = CalloutType.FriendlyWarning
+                }];
+            //var callouts = new List<CalloutConfiguration>
+            //{
+            //    new CalloutConfiguration
+            //    {
+            //        Headline = "No results",
+            //        Content = "Query result has no data, please check the Event log for errors or modify your query",
+            //        Placement = CalloutPlacement.OnPaper,
+            //        Type = CalloutType.FriendlyWarning
+            //    }
+            //};
+
+            // Load saved queries for the current channel and show them as a callout on the page
+            //try
+            //{
+            //    var savedQueries = (await savedQueryProvider.Get()
+            //        .WhereEquals(nameof(ReportingReportInfo.ReportingReportChannelSettingsID), ReportingChannelSettingId)
+            //        .GetEnumerableTypedResultAsync()).ToList();
+
+            //    if (savedQueries.Any())
+            //    {
+            //        var listItems = string.Join(string.Empty, savedQueries.Select(q => $"<li>{HTMLHelper.HTMLEncode(q.ReportingReportCodeName)}</li>"));
+
+            //        PageParameterValues? parameters = null;
+            //        var channelIdString = ReportingChannelSettingId.ToString();
+            //        if (!string.IsNullOrEmpty(channelIdString) && int.TryParse(channelIdString, out var channelId))
+            //        {
+            //            parameters = new PageParameterValues
+            //            {
+            //                { typeof(ReportingApplicationChannelSettingsEditSection), channelId }
+            //            };
+            //        }
+
+            //        string editUrl;
+            //        if (parameters == null)
+            //        {
+            //            editUrl = pageLinkGenerator.GetPath<EditQuery>();
+            //        }
+            //        else
+            //        {
+            //            editUrl = pageLinkGenerator.GetPath<EditQuery>(parameters);
+            //        }
+            //        // Render as plain text to avoid HTML being escaped in callouts.
+            //        var names = savedQueries.Select(q => HTMLHelper.HTMLEncode(q.ReportingReportDisplayName));
+            //        var content = $"Open editor: {editUrl}{Environment.NewLine}Saved queries:{Environment.NewLine}{string.Join(Environment.NewLine, names.Select(n => " - " + n))}";
+
+            //        callouts.Add(new CalloutConfiguration
+            //        {
+            //            Headline = "Saved queries",
+            //            Content = content,
+            //            Placement = CalloutPlacement.OnPaper,
+            //            Type = CalloutType.FriendlyWarning
+            //        });
+
+            //    }
+            //}
+            //catch (Exception ex)
+            //{
+            //    eventLogService.LogException(nameof(ResultListing), nameof(ConfigurePage), ex);
+            //}
+
+            //PageConfiguration.Callouts = callouts;
+
             await base.ConfigurePage();
+            return;
         }
 
 
@@ -144,9 +192,12 @@ namespace DancingGoat
         {
             int? _channelId = ReportingChannelSettingId;
             var channelIdString = _channelId.ToString();
-            string initialQuery = string.IsNullOrEmpty(channelIdString)
-                ? "WHERE ChannelID = {channelId}\n"
-                : $"WHERE ChannelID = {channelIdString}\n";
+            string initialQuery = $"""
+/*
+No query has been configured.
+Use ChannelID = {channelIdString} in your custom query.
+*/
+""";
 
             sqlBrowserQueryProvider.SetQuery(initialQuery);
 
