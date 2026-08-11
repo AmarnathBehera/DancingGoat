@@ -35,6 +35,12 @@ namespace DancingGoat
 
 
         /// <summary>
+        /// Gets the current result set converted to a client-side result model.
+        /// </summary>
+        public SqlBrowserQueryResult GetQueryResult();
+
+
+        /// <summary>
         /// Gets the current result set converted to <see cref="IDataContainer"/>s. Automatically sets the identifier for each container to
         /// be retrieved later by <see cref="GetRowAsText"/>.
         /// </summary>

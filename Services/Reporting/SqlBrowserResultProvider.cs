@@ -18,6 +18,7 @@ namespace DancingGoat
     {
         private string? query;
         private DataSet? result;
+        private string? errorMessage;
         public const string ROW_IDENTIFIER_COLUMN = $"{nameof(SqlBrowserResultProvider)}_result_identifier";
 
         public IEnumerable<string> GetColumnNames()
@@ -121,9 +122,38 @@ namespace DancingGoat
         public string? GetQuery() => query;
 
 
+        public SqlBrowserQueryResult GetQueryResult()
+        {
+            EnsureResult();
+
+            if (ResultsAreEmpty())
+            {
+                return new SqlBrowserQueryResult
+                {
+                    ErrorMessage = errorMessage
+                };
+            }
+
+            var columnNames = GetColumnNames().ToArray();
+            var rows = result!.Tables[0]
+                .Rows
+                .OfType<DataRow>()
+                .Select(row => columnNames.Select(column => row[column]?.ToString() ?? string.Empty).ToArray())
+                .ToArray();
+
+            return new SqlBrowserQueryResult
+            {
+                Columns = columnNames,
+                Rows = rows,
+                ErrorMessage = errorMessage
+            };
+        }
+
+
         public void SetQuery(string queryText)
         {
             result = null;
+            errorMessage = null;
             query = queryText;
         }
 
@@ -140,8 +170,8 @@ namespace DancingGoat
 
             if (string.IsNullOrEmpty(query))
             {
-                // No query set — treat as 'no results' rather than throwing.
                 result = new DataSet();
+                errorMessage = "No query entered.";
                 eventLogService.LogWarning(nameof(SqlBrowserResultProvider), nameof(EnsureResult),
                     $"No query present in {nameof(SqlBrowserResultProvider)}");
                 return;
@@ -150,9 +180,19 @@ namespace DancingGoat
             try
             {
                 var validationResult = validator.ValidateSqlStatement(query);
+                if (validationResult is null)
+                {
+                    result = new DataSet();
+                    errorMessage = "The SQL validator did not return a result.";
+                    eventLogService.LogWarning(nameof(SqlBrowserResultProvider), nameof(EnsureResult), errorMessage);
+
+                    return;
+                }
+
                 if (!validationResult.IsValid)
                 {
                     result = new DataSet();
+                    errorMessage = validationResult.ErrorMessage;
                     eventLogService.LogWarning(nameof(SqlBrowserResultProvider), nameof(EnsureResult),
                         $"User attempted to execute invalid query:{Environment.NewLine}{query}{Environment.NewLine}Error: {validationResult.ErrorMessage}");
 
@@ -166,6 +206,7 @@ namespace DancingGoat
             catch (Exception ex)
             {
                 result = new DataSet();
+                errorMessage = ex.Message;
                 eventLogService.LogException(nameof(SqlBrowserResultProvider), nameof(EnsureResult), ex);
             }
         }
@@ -177,9 +218,4 @@ namespace DancingGoat
         private bool ResultsAreEmpty() => result is null || result.Tables.Count == 0;
     }
 
-}
-// csharp
-public class EditQueryModel
-{
-    public string? QueryText { get; set; }
 }
