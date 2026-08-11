@@ -16,7 +16,7 @@ namespace DancingGoat
     /// <summary>
     /// Listing UI page which displays the results of a SQL query.
     /// </summary>
-    [UINavigation(false)]
+    [UINavigation(true)]
     [UIEvaluatePermission(SystemPermissions.VIEW)]
 
     public class ResultListing(

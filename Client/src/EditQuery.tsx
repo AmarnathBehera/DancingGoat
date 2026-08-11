@@ -43,6 +43,14 @@ interface EditQueryClientProperties {
     reportingChannelSettingId: number;
 }
 
+/** Copy of C# SqlBrowserQueryResult class */
+interface SqlBrowserQueryResult {
+    columns: string[];
+    rows: string[][];
+    errorMessage: string | undefined;
+    autoSavedQuery: SavedQuery | undefined;
+}
+
 export const EditQuery = (props: EditQueryClientProperties) => {
     const { executeCommand } = usePageCommandProvider();
 
@@ -50,9 +58,28 @@ export const EditQuery = (props: EditQueryClientProperties) => {
 
     const [queryText, setQueryText] = useState(props.query);
     const [savedQueries, setSavedQueries] = useState(props.savedQueries);
+    const [queryResult, setQueryResult] = useState<SqlBrowserQueryResult>();
+    const [isRunningQuery, setIsRunningQuery] = useState(false);
 
     const { execute: runSql } =
-        usePageCommand<void, string>('RunSql');
+        usePageCommand<SqlBrowserQueryResult, string>('RunSql', {
+            after: result => {
+                setIsRunningQuery(false);
+
+                if (!result) {
+                    return;
+                }
+
+                setQueryResult(result);
+
+                if (result.autoSavedQuery) {
+                    setSavedQueries(currentQueries => [
+                        ...currentQueries,
+                        result.autoSavedQuery as SavedQuery
+                    ]);
+                }
+            }
+        });
 
     const { execute: notify } =
         usePageCommand<void, string>('Notify');
@@ -67,6 +94,25 @@ export const EditQuery = (props: EditQueryClientProperties) => {
                 const newQueries = [...savedQueries];
                 newQueries.push(newQuery);
                 setSavedQueries(newQueries);
+            }
+        });
+
+    const { execute: renameQuery } =
+        usePageCommand<SavedQuery, SavedQuery>('RenameQuery', {
+            after: updatedQuery => {
+                if (!updatedQuery) {
+                    return;
+                }
+
+                setSavedQueries(currentQueries =>
+                    currentQueries.map(query => {
+                        if (query.id !== updatedQuery.id) {
+                            return query;
+                        }
+
+                        return updatedQuery;
+                    })
+                );
             }
         });
 
@@ -92,6 +138,19 @@ export const EditQuery = (props: EditQueryClientProperties) => {
                 );
             }
         });
+
+    const renameClick = (query: SavedQuery) => {
+        const name = prompt('Enter query name', query.name);
+
+        if (!name) {
+            return;
+        }
+
+        renameQuery({
+            ...query,
+            name
+        });
+    };
 
     const deleteClick = (id: number) => {
         const confirmed =
@@ -147,6 +206,7 @@ WHERE ChannelID = ${ props.reportingChannelSettingId }
             return;
         }
 
+        setIsRunningQuery(true);
         runSql(queryText);
     };
 
@@ -245,13 +305,23 @@ WHERE ChannelID = ${ props.reportingChannelSettingId }
                         label: 'Run',
                         icon: 'xp-caret-right',
                         tooltip: 'Execute query',
-                        onClick: () => runSql(q.text)
+                        onClick: () => {
+                            setQueryText(q.text);
+                            setIsRunningQuery(true);
+                            runSql(q.text);
+                        }
                     },
                     {
                         label: 'Copy',
                         icon: 'xp-doc-copy',
                         tooltip: 'Copy query to editor',
                         onClick: () => transferClick(q.text)
+                    },
+                    {
+                        label: 'Rename',
+                        icon: 'xp-edit',
+                        tooltip: 'Rename query',
+                        onClick: () => renameClick(q)
                     },
                     {
                         label: 'Delete',
@@ -269,6 +339,72 @@ WHERE ChannelID = ${ props.reportingChannelSettingId }
                 <span>{q.text}</span>
             </BarItemDraggable>
         ));
+
+
+    const renderQueryResult = () => {
+        if (isRunningQuery) {
+            return (
+                <Card headline="Results">
+                    <span>Running query...</span>
+                </Card>
+            );
+        }
+
+        if (!queryResult) {
+            return null;
+        }
+
+        if (queryResult.errorMessage) {
+            return (
+                <Card headline="Results">
+                    <span>{queryResult.errorMessage}</span>
+                </Card>
+            );
+        }
+
+        if (queryResult.rows.length === 0) {
+            return (
+                <Card headline="Results">
+                    <span>No rows returned.</span>
+                </Card>
+            );
+        }
+
+        return (
+            <Card headline={`Results (${ queryResult.rows.length })`}>
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr>
+                                {queryResult.columns.map(column => (
+                                    <th
+                                        key={column}
+                                        style={{ textAlign: 'left', borderBottom: '1px solid #d6d9dc', padding: '0.5rem' }}
+                                    >
+                                        {column}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {queryResult.rows.map((row, rowIndex) => (
+                                <tr key={rowIndex}>
+                                    {row.map((value, columnIndex) => (
+                                        <td
+                                            key={`${ rowIndex }-${ columnIndex }`}
+                                            style={{ borderBottom: '1px solid #eef0f2', padding: '0.5rem', verticalAlign: 'top' }}
+                                        >
+                                            {value}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </Card>
+        );
+    };
 
     const renderTextActions = () => (
         <>
@@ -349,6 +485,8 @@ WHERE ChannelID = ${ props.reportingChannelSettingId }
                             renderActions={renderTextActions}
                         />
                     </Card>
+
+                    {renderQueryResult()}
 
                     {savedQueries.length > 0 && (
                         <Card headline="Saved queries">
