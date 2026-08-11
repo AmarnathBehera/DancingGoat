@@ -91,40 +91,6 @@ WHERE ChannelID = {ReportingChannelSettingId}
         }
 
         [PageCommand]
-        public Task<ICommandResponse<SavedQuery?>> RenameQuery(SavedQuery query)
-        {
-            if (query.ID <= 0 || string.IsNullOrWhiteSpace(query.Name))
-            {
-                return Task.FromResult(
-                    ResponseFrom<SavedQuery?>(null)
-                        .AddErrorMessage("Received empty parameter"));
-            }
-
-            var savedQuery = savedQueryProvider.Get()
-                .TopN(1)
-                .WhereEquals(nameof(ReportingReportInfo.ReportingReportID), query.ID)
-                .WhereEquals(nameof(ReportingReportInfo.ReportingReportChannelSettingsID), ReportingChannelSettingId)
-                .FirstOrDefault();
-
-            if (savedQuery is null)
-            {
-                return Task.FromResult(
-                    ResponseFrom<SavedQuery?>(null)
-                        .AddErrorMessage($"Query {query.ID} not found"));
-            }
-
-            savedQuery.ReportingReportDisplayName = query.Name;
-            savedQuery.ReportingReportCodeName = GenerateQueryCodeName(query.Name);
-            savedQuery.Update();
-
-            query.Text = savedQuery.ReportingReportQuery;
-
-            return Task.FromResult(
-                ResponseFrom<SavedQuery?>(query)
-                    .AddSuccessMessage("Query renamed!"));
-        }
-
-        [PageCommand]
         public Task<ICommandResponse<int>> DeleteQuery(int id)
         {
             var query = savedQueryProvider.Get()
