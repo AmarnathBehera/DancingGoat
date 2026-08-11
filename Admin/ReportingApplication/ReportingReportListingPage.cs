@@ -25,16 +25,6 @@ using System.Threading.Tasks;
     templateName: "@dancing-goat/reporting/EditQuery",
     order: UIPageOrder.First)]
 
-//// Register full-screen editor page so IPageLinkGenerator can resolve EditQueryPage
-//[assembly: UIPage(
-//    parentType: typeof(ReportingApplication),
-//    slug: "edit-query-page",
-//    uiPageType: typeof(EditQueryPage),
-//    name: "Edit Query (Full screen)",
-//    // Use the same client template as the existing EditQuery page so the SQL editor UI renders
-//    templateName: "@dancing-goat/reporting/EditQuery",
-//    order: UIPageOrder.NoOrder)]
-
 [assembly: UIPage(
     parentType: typeof(ReportingReportListingPage),
     slug: "exports",
@@ -70,16 +60,6 @@ public class ReportingReportListingPage : ListingPage
         PageConfiguration.ColumnConfigurations
             .AddColumn(nameof(ReportingReportInfo.ReportingReportQuery), stringLocalizer["ReportQuery"]);
 
-
-        //PageConfiguration.HeaderActions.AddLink<ReportingReportCreatePage>(
-        //    stringLocalizer["Add Report"],
-        //    parameters: new PageParameterValues
-        //        {
-        //        { typeof(ReportingApplicationChannelSettingsEditSection), ReportingReportId }
-        //        });
-
-
-
         PageConfiguration.TableActions
             .AddDeleteAction(nameof(Delete));
 
@@ -91,6 +71,5 @@ public class ReportingReportListingPage : ListingPage
 
         return base.ConfigurePage();
     }
-
 
 }
