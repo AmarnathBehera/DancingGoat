@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace DancingGoat
@@ -138,6 +139,8 @@ WHERE ChannelID = {ReportingChannelSettingId}
                 var newQuery = new ReportingReportInfo
                 {
                     ReportingReportDisplayName = query.Name,
+                    ReportingReportCodeName = GenerateQueryCodeName(query.Name),
+                    ReportingReportChannelSettingsID = ReportingChannelSettingId,
                     ReportingReportQuery = query.Text
                 };
 
@@ -192,9 +195,12 @@ WHERE ChannelID = {ReportingChannelSettingId}
         {
             try
             {
+                string displayName = $"Query {DateTime.Now:yyyyMMdd HHmmss}";
                 var savedQuery = new ReportingReportInfo
                 {
-                    ReportingReportDisplayName = $"Query {DateTime.Now:yyyyMMdd HHmmss}",
+                    ReportingReportDisplayName = displayName,
+                    ReportingReportCodeName = GenerateQueryCodeName(displayName),
+                    ReportingReportChannelSettingsID = ReportingChannelSettingId,
                     ReportingReportQuery = query
                 };
 
@@ -211,6 +217,20 @@ WHERE ChannelID = {ReportingChannelSettingId}
 
                 return null;
             }
+        }
+
+
+        private static string GenerateQueryCodeName(string displayName)
+        {
+            string codeName = Regex.Replace(displayName, "[^a-zA-Z0-9_.-]", "_");
+            codeName = codeName.Trim('.');
+
+            if (string.IsNullOrWhiteSpace(codeName))
+            {
+                codeName = "Query";
+            }
+
+            return $"{codeName}_{Guid.NewGuid():N}";
         }
 
 

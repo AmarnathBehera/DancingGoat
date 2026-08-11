@@ -182,14 +182,10 @@ namespace DancingGoat
                 var validationResult = validator.ValidateSqlStatement(query);
                 if (validationResult is null)
                 {
-                    result = new DataSet();
-                    errorMessage = "The SQL validator did not return a result.";
-                    eventLogService.LogWarning(nameof(SqlBrowserResultProvider), nameof(EnsureResult), errorMessage);
-
-                    return;
+                    eventLogService.LogWarning(nameof(SqlBrowserResultProvider), nameof(EnsureResult),
+                        "The SQL validator did not return a result. Executing the query without validator feedback.");
                 }
-
-                if (!validationResult.IsValid)
+                else if (!validationResult.IsValid)
                 {
                     result = new DataSet();
                     errorMessage = validationResult.ErrorMessage;
