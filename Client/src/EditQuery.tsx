@@ -97,6 +97,25 @@ export const EditQuery = (props: EditQueryClientProperties) => {
             }
         });
 
+    const { execute: renameQuery } =
+        usePageCommand<SavedQuery, SavedQuery>('RenameQuery', {
+            after: updatedQuery => {
+                if (!updatedQuery) {
+                    return;
+                }
+
+                setSavedQueries(currentQueries =>
+                    currentQueries.map(query => {
+                        if (query.id !== updatedQuery.id) {
+                            return query;
+                        }
+
+                        return updatedQuery;
+                    })
+                );
+            }
+        });
+
     const { execute: deleteQuery } =
         usePageCommand<number, number>('DeleteQuery', {
             after: async id => {
@@ -119,6 +138,19 @@ export const EditQuery = (props: EditQueryClientProperties) => {
                 );
             }
         });
+
+    const renameClick = (query: SavedQuery) => {
+        const name = prompt('Enter query name', query.name);
+
+        if (!name) {
+            return;
+        }
+
+        renameQuery({
+            ...query,
+            name
+        });
+    };
 
     const deleteClick = (id: number) => {
         const confirmed =
@@ -284,6 +316,12 @@ WHERE ChannelID = ${ props.reportingChannelSettingId }
                         icon: 'xp-doc-copy',
                         tooltip: 'Copy query to editor',
                         onClick: () => transferClick(q.text)
+                    },
+                    {
+                        label: 'Rename',
+                        icon: 'xp-edit',
+                        tooltip: 'Rename query',
+                        onClick: () => renameClick(q)
                     },
                     {
                         label: 'Delete',

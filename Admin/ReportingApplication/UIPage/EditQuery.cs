@@ -96,6 +96,7 @@ WHERE ChannelID = {ReportingChannelSettingId}
             var query = savedQueryProvider.Get()
                 .TopN(1)
                 .WhereEquals(nameof(ReportingReportInfo.ReportingReportID), id)
+                .WhereEquals(nameof(ReportingReportInfo.ReportingReportChannelSettingsID), ReportingChannelSettingId)
                 .FirstOrDefault();
 
             if (query is null)
@@ -240,6 +241,7 @@ WHERE ChannelID = {ReportingChannelSettingId}
 
         private Task<IEnumerable<ReportingReportInfo>> GetSavedQueries() =>
             savedQueryProvider.Get()
+                .WhereEquals(nameof(ReportingReportInfo.ReportingReportChannelSettingsID), ReportingChannelSettingId)
                 .GetEnumerableTypedResultAsync();
 
         private IEnumerable<DatabaseTable> LoadTables(CacheSettings cs)
