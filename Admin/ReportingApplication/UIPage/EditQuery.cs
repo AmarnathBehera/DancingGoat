@@ -140,8 +140,10 @@ WHERE ChannelID = {ReportingChannelSettingId}
                 {
                     ReportingReportDisplayName = query.Name,
                     ReportingReportCodeName = GenerateQueryCodeName(query.Name),
+                    ReportingReportDescription = string.Empty,
                     ReportingReportChannelSettingsID = ReportingChannelSettingId,
-                    ReportingReportQuery = query.Text
+                    ReportingReportQuery = query.Text,
+                    ReportingReportGUID = Guid.NewGuid()
                 };
 
                 newQuery.Insert();
@@ -200,8 +202,10 @@ WHERE ChannelID = {ReportingChannelSettingId}
                 {
                     ReportingReportDisplayName = displayName,
                     ReportingReportCodeName = GenerateQueryCodeName(displayName),
+                    ReportingReportDescription = string.Empty,
                     ReportingReportChannelSettingsID = ReportingChannelSettingId,
-                    ReportingReportQuery = query
+                    ReportingReportQuery = query,
+                    ReportingReportGUID = Guid.NewGuid()
                 };
 
                 savedQuery.Insert();
