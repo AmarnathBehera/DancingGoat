@@ -48,7 +48,7 @@ interface SqlBrowserQueryResult {
     columns: string[];
     rows: string[][];
     errorMessage: string | undefined;
-    autoSavedQuery: SavedQuery | undefined;
+   // autoSavedQuery: SavedQuery | undefined;
 }
 
 export const EditQuery = (props: EditQueryClientProperties) => {
@@ -72,18 +72,43 @@ export const EditQuery = (props: EditQueryClientProperties) => {
 
                 setQueryResult(result);
 
-                if (result.autoSavedQuery) {
-                    setSavedQueries(currentQueries => [
-                        ...currentQueries,
-                        result.autoSavedQuery as SavedQuery
-                    ]);
-                }
+                // if (result.autoSavedQuery) {
+                //     setSavedQueries(currentQueries => [
+                //         ...currentQueries,
+                //         result.autoSavedQuery as SavedQuery
+                //     ]);
+                // }
             }
         });
 
     const { execute: notify } =
         usePageCommand<void, string>('Notify');
+    interface ExportConfirmationDialogModel {
+        exportType: string;
+        fileName: string;
+    }
 
+    const { execute: exportQuery } =
+        usePageCommand<string, ExportConfirmationDialogModel>('ExportQuery');
+
+    const exportClick = async () => {
+        if (!queryResult || queryResult.rows.length === 0) {
+            return;
+        }
+
+        const model: ExportConfirmationDialogModel = {
+            exportType: 'csv',
+            fileName: 'export'
+        };
+
+        const result = await exportQuery(model);
+
+        console.log(result);
+
+        if (result != null) {
+            notify(`Export created: ${result}`);
+        }
+    };
     const { execute: saveQuery } =
         usePageCommand<SavedQuery, SavedQuery>('SaveQuery', {
             after: newQuery => {
@@ -340,7 +365,6 @@ WHERE ChannelID = ${ props.reportingChannelSettingId }
             </BarItemDraggable>
         ));
 
-
     const renderQueryResult = () => {
         if (isRunningQuery) {
             return (
@@ -370,41 +394,56 @@ WHERE ChannelID = ${ props.reportingChannelSettingId }
             );
         }
 
-        return (
-            <Card headline={`Results (${ queryResult.rows.length })`}>
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                            <tr>
-                                {queryResult.columns.map(column => (
-                                    <th
-                                        key={column}
-                                        style={{ textAlign: 'left', borderBottom: '1px solid #d6d9dc', padding: '0.5rem' }}
-                                    >
-                                        {column}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {queryResult.rows.map((row, rowIndex) => (
-                                <tr key={rowIndex}>
-                                    {row.map((value, columnIndex) => (
-                                        <td
-                                            key={`${ rowIndex }-${ columnIndex }`}
-                                            style={{ borderBottom: '1px solid #eef0f2', padding: '0.5rem', verticalAlign: 'top' }}
-                                        >
-                                            {value}
-                                        </td>
-                                    ))}
-                                </tr>
+       // inside the existing renderQueryResult() function, replace or augment the Card header area
+return (
+    <Card headline="Results">
+        {/* top bar: left can be empty or show summary, right shows Export button */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <div>
+                {/* optional: show row count */}
+                <strong>{queryResult.rows.length} rows</strong>
+            </div>
+
+            <div>
+                <Button
+                    label="Export CSV"
+                    color={ButtonColor.Secondary}
+                    size={ButtonSize.S}
+                    onClick={() => exportClick()}
+                    
+                />
+            </div>
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                    <tr>
+                        {queryResult.columns.map(column => (
+                            <th key={column} style={{ textAlign: 'left', borderBottom: '1px solid #d6d9dc', padding: '0.5rem' }}>
+                                {column}
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {queryResult.rows.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                            {row.map((value, columnIndex) => (
+                                <td key={`${rowIndex}-${columnIndex}`} style={{ borderBottom: '1px solid #eef0f2', padding: '0.5rem', verticalAlign: 'top' }}>
+                                    {value}
+                                </td>
                             ))}
-                        </tbody>
-                    </table>
-                </div>
-            </Card>
-        );
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    </Card>
+);
     };
+
 
     const renderTextActions = () => (
         <>
@@ -432,6 +471,15 @@ WHERE ChannelID = ${ props.reportingChannelSettingId }
                 icon="xp-doc-torn"
             />
 
+            <Button
+                label="Export"
+                color={ButtonColor.Secondary}
+                size={ButtonSize.S}
+                onClick={exportClick}
+                icon="xp-arrows-v"
+            />
+
+            {/* }
             {props.tables.length > 0 && (
                 <DropDownSelectMenu
                     renderTrigger={(ref, onTriggerClick) => (
@@ -456,9 +504,12 @@ WHERE ChannelID = ${ props.reportingChannelSettingId }
                     ))}
                 </DropDownSelectMenu>
             )}
+            */
+               
+            }
         </>
     );
-
+  
     return (
         <Row spacing={Spacing.XL}>
             <Column cols={Cols.Col1} />
@@ -505,7 +556,6 @@ WHERE ChannelID = ${ props.reportingChannelSettingId }
         </Row>
     );
 };
-
 export const EditQueryTemplate = EditQuery;
 
 export default EditQuery;

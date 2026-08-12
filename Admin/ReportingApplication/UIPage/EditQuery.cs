@@ -280,63 +280,70 @@ Use ChannelID = {ReportingChannelSettingId} in your custom query.
                 .WhereEquals(nameof(ReportingReportInfo.ReportingReportChannelSettingsID), ReportingChannelSettingId)
                 .GetEnumerableTypedResultAsync();
 
-        private IEnumerable<DatabaseTable> LoadTables(CacheSettings cs)
+        //        private IEnumerable<DatabaseTable> LoadTables(CacheSettings cs)
+        //        {
+        //            try
+        //            {
+        //                string query = @"
+        //SELECT
+        //    T.name AS 'table',
+        //    C.name AS 'column'
+        //FROM sys.objects AS T
+        //JOIN sys.columns AS C
+        //    ON T.object_id = C.object_id
+        //WHERE T.type = 'U'
+        //ORDER BY T.name ASC";
+
+        //                var result = ConnectionHelper.ExecuteQuery(
+        //                    query,
+        //                    null,
+        //                    QueryTypeEnum.SQLQuery);
+
+        //                if (result.Tables.Count == 0)
+        //                {
+        //                    cs.Cached = false;
+        //                    return [];
+        //                }
+
+        //                return result.Tables[0]
+        //                    .Rows
+        //                    .OfType<DataRow>()
+        //                    .GroupBy(r => r["table"])
+        //                    .Select(group => new DatabaseTable
+        //                    {
+        //                        Name = group.Key?.ToString() ?? string.Empty,
+        //                        Columns = group.Select(
+        //                            row => row["column"]?.ToString() ?? string.Empty)
+        //                    });
+        //            }
+        //            catch (Exception ex)
+        //            {
+        //                cs.Cached = false;
+
+        //                eventLogService.LogException(
+        //                    nameof(EditQuery),
+        //                    nameof(LoadTables),
+        //                    ex);
+
+        //                return [];
+        //            }
+        //        }
+
+
+        // replace current ExportQuery method with this
+
+        [PageCommand]
+        public async Task<ICommandResponse<string>> ExportQuery(System.Text.Json.JsonElement? rawModel)
         {
             try
             {
-                string query = @"
-SELECT
-    T.name AS 'table',
-    C.name AS 'column'
-FROM sys.objects AS T
-JOIN sys.columns AS C
-    ON T.object_id = C.object_id
-WHERE T.type = 'U'
-ORDER BY T.name ASC";
+                ExportConfirmationDialogModel? model = null;
 
-                var result = ConnectionHelper.ExecuteQuery(
-                    query,
-                    null,
-                    QueryTypeEnum.SQLQuery);
-
-                if (result.Tables.Count == 0)
+                if (rawModel.HasValue && rawModel.Value.ValueKind != System.Text.Json.JsonValueKind.Null)
                 {
-                    cs.Cached = false;
-                    return [];
+                    model = System.Text.Json.JsonSerializer.Deserialize<ExportConfirmationDialogModel>(rawModel.Value.GetRawText());
                 }
 
-                return result.Tables[0]
-                    .Rows
-                    .OfType<DataRow>()
-                    .GroupBy(r => r["table"])
-                    .Select(group => new DatabaseTable
-                    {
-                        Name = group.Key?.ToString() ?? string.Empty,
-                        Columns = group.Select(
-                            row => row["column"]?.ToString() ?? string.Empty)
-                    });
-            }
-            catch (Exception ex)
-            {
-                cs.Cached = false;
-
-                eventLogService.LogException(
-                    nameof(EditQuery),
-                    nameof(LoadTables),
-                    ex);
-
-                return [];
-            }
-        }
-
-
-
-        // Add this PageCommand method:
-        [PageCommand]
-        public async Task<ICommandResponse<string>> ExportQuery(ExportConfirmationDialogModel model)
-        {
-            try
-            {
                 var exportType = (model?.ExportType ?? "csv").ToLower() switch
                 {
                     "csv" => SqlBrowserExportType.Csv,
@@ -345,7 +352,6 @@ ORDER BY T.name ASC";
                     _ => SqlBrowserExportType.Csv
                 };
 
-                // If user didn't provide filename, generate one
                 var fileName = string.IsNullOrWhiteSpace(model?.FileName)
                     ? $"export-{DateTime.Now:yyyy-MM-dd-HH-mm-ss}.{(exportType == SqlBrowserExportType.Excel ? "xlsx" : exportType == SqlBrowserExportType.Json ? "json" : "csv")}"
                     : model.FileName;
@@ -356,13 +362,16 @@ ORDER BY T.name ASC";
                 {
                     return ResponseFrom(exportedPath).AddSuccessMessage($"Exported results to {exportedPath}");
                 }
+                else
+                {
+                    return ResponseFrom<string>(string.Empty).AddErrorMessage("Export failed, please check the Event log for details.");
+                }
 
-                return ResponseFrom<string>(string.Empty).AddErrorMessage("Export failed, please check the Event log for details.");
             }
             catch (Exception ex)
             {
                 eventLogService.LogException(nameof(EditQuery), nameof(ExportQuery), ex);
-                return ResponseFrom<string>(string.Empty).AddErrorMessage("Export failed, see event log.");
+                return ResponseFrom<string>(string.Empty);
             }
         }
 

@@ -29,7 +29,7 @@ namespace DancingGoat
             PageConfiguration.ColumnConfigurations
                 .AddComponentColumn(
                     "download",
-                    "@/DownloadExport",
+                    "@dancing-goat/reporting/DownloadExportTableCellComponent",
                     "Download",
                     modelRetriever: (formattedColumnValue, rowData) =>
                         new DownloadExportClientProperties
