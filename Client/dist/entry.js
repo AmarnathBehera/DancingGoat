@@ -311,7 +311,6 @@ __webpack_require__.r(__webpack_exports__);
 
 // EXPORTS
 __webpack_require__.d(__webpack_exports__, {
-  DownloadExportTableCellComponent: () => (/* reexport */ downloadExportTableCellComponent),
   EditQuery: () => (/* reexport */ EditQueryTemplate),
   EditQueryTemplate: () => (/* reexport */ EditQueryTemplate),
   "default": () => (/* reexport */ EditQueryTemplate)
@@ -356,21 +355,11 @@ const EditQuery = props => {
         return;
       }
       setQueryResult(result);
-
-      // if (result.autoSavedQuery) {
-      //     setSavedQueries(currentQueries => [
-      //         ...currentQueries,
-      //         result.autoSavedQuery as SavedQuery
-      //     ]);
-      // }
     }
   });
   const {
     execute: notify
   } = (0,xperience_admin_base_.usePageCommand)('Notify');
-  // Use executeCommand from provider to get a promise-based result
-  // const { execute: exportQuery } = usePageCommand<ExportResult | null, ExportConfirmationDialogModel>('ExportQuery');
-
   const exportClick = async () => {
     if (!queryResult || queryResult.rows.length === 0) {
       return;
@@ -768,92 +757,9 @@ WHERE ChannelID = ${props.reportingChannelSettingId}
 };
 const EditQueryTemplate = EditQuery;
 /* harmony default export */ const src_EditQuery = ((/* unused pure expression or super */ null && (EditQuery)));
-;// ./src/downloadExportTableCellComponent.tsx
-
-
-
-
-/** Copy of C# DownloadExportClientProperties class. */
-
-const DownloadExportTableCellComponent = props => {
-  const {
-    executeCommand
-  } = (0,xperience_admin_base_.usePageCommandProvider)();
-  const [isLoading, setIsLoading] = (0,external_react_.useState)(false);
-  const [error, setError] = (0,external_react_.useState)(null);
-
-  /**
-   * Determines the MIME type based on file extension
-   */
-  const getMimeType = fileName => {
-    const ext = fileName.split('.').pop()?.toLowerCase();
-    const mimeTypes = {
-      'csv': 'text/csv',
-      'json': 'application/json',
-      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'xls': 'application/vnd.ms-excel',
-      'pdf': 'application/pdf',
-      'txt': 'text/plain',
-      'xml': 'application/xml'
-    };
-    return mimeTypes[ext || ''] || 'application/octet-stream';
-  };
-
-  /**
-   * Click handler for export download button with loading state and error handling
-   */
-  const handleExportDownload = (0,external_react_.useCallback)(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Fetch Base64 encoded file content
-      const base64 = await executeCommand("GetBase64String", props.fileName);
-      if (!base64) {
-        throw new Error('Failed to retrieve file content');
-      }
-
-      // Get appropriate MIME type
-      const mime = getMimeType(props.fileName);
-
-      // Create download link and trigger download
-      const href = `data:${mime};base64,${base64}`;
-      const link = document.createElement('a');
-      link.style.display = 'none';
-      link.href = href;
-      link.download = props.fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // Optional: Log successful download
-      console.log(`File downloaded successfully: ${props.fileName}`);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to download file. Please try again.';
-      setError(errorMessage);
-      console.error('Download error:', err);
-
-      // Optional: Show error to user (you might want to use a toast/notification component)
-      alert(`Error: ${errorMessage}`);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [props.fileName, executeCommand]);
-  return /*#__PURE__*/(0,jsx_runtime.jsx)(xperience_admin_components_.Button, {
-    icon: "xp-arrow-down-line",
-    color: xperience_admin_components_.ButtonColor.Quinary,
-    size: xperience_admin_components_.ButtonSize.S,
-    borderless: true,
-    disabled: isLoading,
-    title: isLoading ? 'Downloading...' : 'Download export file',
-    onClick: () => handleExportDownload()
-  });
-};
-/* harmony default export */ const downloadExportTableCellComponent = (DownloadExportTableCellComponent);
 ;// ./src/EditQueryTemplate.tsx
 
 ;// ./src/entry.tsx
-
 
 
 

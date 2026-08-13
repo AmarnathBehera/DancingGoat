@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Remove="App_Data\CMSModules\WebFarm\webfarm.sync" />
+    <None Remove="Client\src\DownloadExportTableCellComponent.tsx" />
   </ItemGroup>
   <ItemGroup>
     <AdminClientPath Include="Client\dist\**">
@@ -31,6 +32,10 @@
     <Content Remove="Client\node_modules\**" />
     <EmbeddedResource Remove="Client\node_modules\**" />
     <None Remove="Client\node_modules\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Admin\ReportingApplication\UIPage\ExportListing.cs" />
+    <Compile Remove="Admin\ReportingApplication\UIPage\Properties\DownloadExportClientProperties.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="app_offline.htm_" Condition="Exists('app_offline.htm_')" CopyToPublishDirectory="PreserveNewest" />

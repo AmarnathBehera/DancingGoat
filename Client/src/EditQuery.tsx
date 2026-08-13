@@ -72,12 +72,6 @@ export const EditQuery = (props: EditQueryClientProperties) => {
 
                 setQueryResult(result);
 
-                // if (result.autoSavedQuery) {
-                //     setSavedQueries(currentQueries => [
-                //         ...currentQueries,
-                //         result.autoSavedQuery as SavedQuery
-                //     ]);
-                // }
             }
         });
 
@@ -93,9 +87,6 @@ export const EditQuery = (props: EditQueryClientProperties) => {
         fileName: string;
         contentType: string;
     }
-
-    // Use executeCommand from provider to get a promise-based result
-    // const { execute: exportQuery } = usePageCommand<ExportResult | null, ExportConfirmationDialogModel>('ExportQuery');
 
     const exportClick = async () => {
         if (!queryResult || queryResult.rows.length === 0) {
@@ -544,32 +535,7 @@ return (
                 icon="xp-arrows-v"
             />
 
-            {/*
-            {props.tables.length > 0 && (
-                <DropDownSelectMenu
-                    renderTrigger={(ref, onTriggerClick) => (
-                        <Button
-                            label="Tables"
-                            size={ButtonSize.S}
-                            borderless
-                            icon="xp-database"
-                            buttonRef={
-                                ref as RefObject<HTMLButtonElement>
-                            }
-                            onClick={() => onTriggerClick()}
-                        />
-                    )}
-                >
-                    {props.tables.map(table => (
-                        <MenuItem
-                            key={table.name}
-                            primaryLabel={table.name}
-                            onClick={() => generateQuery(table)}
-                        />
-                    ))}
-                </DropDownSelectMenu>
-            )}
-            */}
+            {}
         </>
     );
   

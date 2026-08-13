@@ -32,25 +32,13 @@ namespace DancingGoat
 
         public override async Task<EditSqlTemplateClientProperties> ConfigureTemplateProperties(EditSqlTemplateClientProperties properties)
         {
-            //properties.Tables = cache.Load(
-            //    LoadTables,
-            //    new CacheSettings(
-            //        10,
-            //        $"{nameof(EditQuery)}|{nameof(ConfigureTemplateProperties)}"));
-
-            var query = sqlBrowserResultProvider.GetQuery();
-
-            if (string.IsNullOrWhiteSpace(query))
-            {
-                query = $"""
+            // Always show the default starter query on page load instead of previously executed query
+            properties.Query = $"""
 /*
 No query has been configured.
 Use ChannelID = {ReportingChannelSettingId} in your custom query.
 */
 """;
-            }
-
-            properties.Query = query;
             properties.SavedQueries = (await GetSavedQueries())
                 .Select(q => new SavedQuery(q));
 
@@ -75,13 +63,65 @@ Use ChannelID = {ReportingChannelSettingId} in your custom query.
                         .AddErrorMessage("No query entered."));
             }
 
+            // Only allow SELECT queries (skip leading comments/whitespace and inspect first token)
+            static string? GetFirstTokenSkippingComments(string sql)
+            {
+                if (string.IsNullOrEmpty(sql))
+                {
+                    return null;
+                }
+
+                int i = 0;
+                int len = sql.Length;
+                while (i < len)
+                {
+                    // skip whitespace
+                    while (i < len && char.IsWhiteSpace(sql[i])) i++;
+                    if (i >= len) break;
+
+                    // skip line comment -- until end of line
+                    if (i + 1 < len && sql[i] == '-' && sql[i + 1] == '-')
+                    {
+                        i += 2;
+                        while (i < len && sql[i] != '\n') i++;
+                        continue;
+                    }
+
+                    // skip block comment /* ... */
+                    if (i + 1 < len && sql[i] == '/' && sql[i + 1] == '*')
+                    {
+                        i += 2;
+                        while (i + 1 < len && !(sql[i] == '*' && sql[i + 1] == '/')) i++;
+                        if (i + 1 < len) i += 2;
+                        continue;
+                    }
+
+                    // next token starts here
+                    int start = i;
+                    while (i < len && (char.IsLetter(sql[i]) || sql[i] == '_')) i++;
+                    if (start == i) // no letter token
+                    {
+                        // consume a non-letter char and continue
+                        i++;
+                        continue;
+                    }
+
+                    return sql.Substring(start, i - start);
+                }
+
+                return null;
+            }
+
+            var firstToken = GetFirstTokenSkippingComments(query)?.ToUpperInvariant();
+            if (firstToken is null || !(firstToken == "SELECT" || firstToken == "WITH"))
+            {
+                // Return an empty result with an error message
+                var errorResult = new SqlBrowserQueryResult { ErrorMessage = "Only SELECT queries (optionally with CTEs) are allowed." };
+                return Task.FromResult(ResponseFrom(errorResult).AddErrorMessage("Only SELECT queries (optionally with CTEs) are allowed."));
+            }
+
             sqlBrowserResultProvider.SetQuery(query);
             var result = sqlBrowserResultProvider.GetQueryResult();
-
-            //if (string.IsNullOrWhiteSpace(result.ErrorMessage))
-            //{
-            //    result.AutoSavedQuery = AutoSaveQuery(query);
-            //}
 
             var response = ResponseFrom(result);
             if (!string.IsNullOrWhiteSpace(result.ErrorMessage))
@@ -230,37 +270,6 @@ Use ChannelID = {ReportingChannelSettingId} in your custom query.
             return ResponseFrom(true);
         }
 
-        //private SavedQuery? AutoSaveQuery(string query)
-        //{
-        //    try
-        //    {
-        //        string displayName = $"Query {DateTime.Now:yyyyMMdd HHmmss}";
-        //        var savedQuery = new ReportingReportInfo
-        //        {
-        //            ReportingReportDisplayName = displayName,
-        //            ReportingReportCodeName = GenerateQueryCodeName(displayName),
-        //            ReportingReportDescription = string.Empty,
-        //            ReportingReportChannelSettingsID = ReportingChannelSettingId,
-        //            ReportingReportQuery = query,
-        //            ReportingReportGUID = Guid.NewGuid()
-        //        };
-
-        //        savedQuery.Insert();
-
-        //        return new SavedQuery(savedQuery);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        eventLogService.LogException(
-        //            nameof(EditQuery),
-        //            nameof(AutoSaveQuery),
-        //            ex);
-
-        //        return null;
-        //    }
-        //}
-
-
         private static string GenerateQueryCodeName(string displayName)
         {
             string codeName = Regex.Replace(displayName, "[^a-zA-Z0-9_.-]", "_");
@@ -279,58 +288,6 @@ Use ChannelID = {ReportingChannelSettingId} in your custom query.
             savedQueryProvider.Get()
                 .WhereEquals(nameof(ReportingReportInfo.ReportingReportChannelSettingsID), ReportingChannelSettingId)
                 .GetEnumerableTypedResultAsync();
-
-        //        private IEnumerable<DatabaseTable> LoadTables(CacheSettings cs)
-        //        {
-        //            try
-        //            {
-        //                string query = @"
-        //SELECT
-        //    T.name AS 'table',
-        //    C.name AS 'column'
-        //FROM sys.objects AS T
-        //JOIN sys.columns AS C
-        //    ON T.object_id = C.object_id
-        //WHERE T.type = 'U'
-        //ORDER BY T.name ASC";
-
-        //                var result = ConnectionHelper.ExecuteQuery(
-        //                    query,
-        //                    null,
-        //                    QueryTypeEnum.SQLQuery);
-
-        //                if (result.Tables.Count == 0)
-        //                {
-        //                    cs.Cached = false;
-        //                    return [];
-        //                }
-
-        //                return result.Tables[0]
-        //                    .Rows
-        //                    .OfType<DataRow>()
-        //                    .GroupBy(r => r["table"])
-        //                    .Select(group => new DatabaseTable
-        //                    {
-        //                        Name = group.Key?.ToString() ?? string.Empty,
-        //                        Columns = group.Select(
-        //                            row => row["column"]?.ToString() ?? string.Empty)
-        //                    });
-        //            }
-        //            catch (Exception ex)
-        //            {
-        //                cs.Cached = false;
-
-        //                eventLogService.LogException(
-        //                    nameof(EditQuery),
-        //                    nameof(LoadTables),
-        //                    ex);
-
-        //                return [];
-        //            }
-        //        }
-
-
-        // replace current ExportQuery method with this
 
         public record ExportResult(string Base64, string FileName, string ContentType);
 
@@ -358,21 +315,13 @@ Use ChannelID = {ReportingChannelSettingId} in your custom query.
                     ? $"export-{DateTime.Now:yyyy-MM-dd-HH-mm-ss}.{(exportType == SqlBrowserExportType.Excel ? "xlsx" : exportType == SqlBrowserExportType.Json ? "json" : "csv")}"
                     : model.FileName;
 
-                // Call the interface method with the correct parameter order and get the bytes
                 var (content, returnedFileName, contentType) = await sqlBrowserExporter.Export(exportType, requestedFileName);
 
-                //if (content == null || content.Length == 0)
-                //{
-                //    return ResponseFrom(string.Empty).AddErrorMessage("Export failed, empty content returned.");
-                //}
-
-                // Prepare export result for browser download (do not write to server disk)
                 if (content == null || content.Length == 0)
                 {
                     return ResponseFrom<ExportResult?>(null).AddErrorMessage("Export failed, empty content returned.");
                 }
 
-                // Prefer the filename returned by exporter if provided
                 var finalFileName = string.IsNullOrWhiteSpace(returnedFileName) ? requestedFileName : returnedFileName;
 
                 var base64 = Convert.ToBase64String(content);

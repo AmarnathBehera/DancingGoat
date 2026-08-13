@@ -27,13 +27,6 @@ using System.Threading.Tasks;
 
 [assembly: UIPage(
     parentType: typeof(ReportingReportListingPage),
-    slug: "exports",
-    uiPageType: typeof(ExportListing),
-    name: "Exported data",
-    templateName: TemplateNames.LISTING,
-    order: UIPageOrder.NoOrder)]
-[assembly: UIPage(
-    parentType: typeof(ReportingReportListingPage),
     slug: "query-browser",
     uiPageType: typeof(ReportingQueryBrowserPage),
     name: "Query Browser",
