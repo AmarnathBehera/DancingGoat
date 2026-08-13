@@ -23,11 +23,8 @@ namespace DancingGoat
             this.resultProvider = resultProvider;
         }
 
-        public async Task<string> Export(SqlBrowserExportType exportType, string? fileName = null)
+        public async Task<(byte[] Content, string FileName, string ContentType)> Export(SqlBrowserExportType exportType, string? fileName = null)
         {
-            string exportDirectory = GetExportDirectory();
-            Directory.CreateDirectory(exportDirectory);
-
             string name = string.IsNullOrWhiteSpace(fileName)
                 ? DateTime.UtcNow.ToString("yyyyMMdd_HHmmss")
                 : Path.GetFileNameWithoutExtension(fileName);
@@ -40,89 +37,55 @@ namespace DancingGoat
                 _ => ".dat"
             };
 
-            string fullPath = Path.Combine(exportDirectory, name + ext);
-
             var columns = resultProvider.GetColumnNames().ToArray();
             var rows = await resultProvider.GetRowsAsDynamic();
 
             if (!columns.Any())
             {
-                return string.Empty;
+                return (Array.Empty<byte>(), string.Empty, "application/octet-stream");
             }
 
-            // JSON Export
+            // JSON
             if (exportType == SqlBrowserExportType.Json)
             {
-                var list = rows
-                    .Select(ToDictionary)
-                    .ToList();
+                var list = rows.Select(ToDictionary).ToList();
 
-                var json = JsonSerializer.Serialize(
+                string json = JsonSerializer.Serialize(
                     list,
                     new JsonSerializerOptions
                     {
                         WriteIndented = true
                     });
 
-                await File.WriteAllTextAsync(
-                    fullPath,
-                    json,
-                    Encoding.UTF8);
-
-                return fullPath;
+                return (
+                    Encoding.UTF8.GetBytes(json),
+                    $"{name}{ext}",
+                    "application/json"
+                );
             }
 
-            // CSV / Excel Export
+            // CSV
             var sb = new StringBuilder();
 
-            static string EscapeCsv(object? value)
-            {
-                if (value == null)
-                {
-                    return string.Empty;
-                }
+            sb.AppendLine(string.Join(",", columns));
 
-                string text = value.ToString() ?? string.Empty;
-
-                if (text.Contains('"'))
-                {
-                    text = text.Replace("\"", "\"\"");
-                }
-
-                if (text.Contains(',') ||
-                    text.Contains('\n') ||
-                    text.Contains('\r') ||
-                    text.Contains('"'))
-                {
-                    text = $"\"{text}\"";
-                }
-
-                return text;
-            }
-
-            // Header row
-            sb.AppendLine(string.Join(",", columns.Select(EscapeCsv)));
-
-            // Data rows
             foreach (var row in rows)
             {
                 var dictionary = ToDictionary(row);
 
-                var values = columns.Select(column =>
-                {
-                    dictionary.TryGetValue(column, out object? value);
-                    return EscapeCsv(value);
-                });
-
-                sb.AppendLine(string.Join(",", values));
+                sb.AppendLine(string.Join(",",
+                    columns.Select(column =>
+                    {
+                        dictionary.TryGetValue(column, out object? value);
+                        return value?.ToString() ?? string.Empty;
+                    })));
             }
 
-            await File.WriteAllTextAsync(
-                fullPath,
-                sb.ToString(),
-                Encoding.UTF8);
-
-            return fullPath;
+            return (
+                Encoding.UTF8.GetBytes(sb.ToString()),
+                $"{name}{ext}",
+                "text/csv"
+            );
         }
 
         private static IDictionary<string, object?> ToDictionary(object row)

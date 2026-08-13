@@ -31,15 +31,16 @@ namespace DancingGoat
                     "download",
                     "@dancing-goat/reporting/DownloadExportTableCellComponent",
                     "Download",
-                    modelRetriever: (formattedColumnValue, rowData) =>
-                        new DownloadExportClientProperties
-                        {
-                            FileName = GetIdentifier(rowData).ToString(),
-                        },
+                    modelRetriever: (_, rowData) => new DownloadExportClientProperties
+                    {
+                        FileName = GetIdentifier(rowData).ToString()
+                    },
                     loadedExternally: true,
                     sortable: false);
+
             PageConfiguration.ColumnConfigurations.AddColumn(ROW_IDENTIFIER_COLUMN, "Name");
-            PageConfiguration.ColumnConfigurations.AddColumn(FILESIZE_COLUMN, "Size (KB)", minWidth: 120);
+            PageConfiguration.ColumnConfigurations.AddColumn(FILESIZE_COLUMN, "Size (KB)");
+
             PageConfiguration.TableActions.AddDeleteAction(nameof(DeleteExport));
 
             await base.ConfigurePage();

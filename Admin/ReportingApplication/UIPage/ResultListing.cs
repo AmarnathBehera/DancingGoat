@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using System.IO;
 
 
 namespace DancingGoat
@@ -141,19 +142,28 @@ namespace DancingGoat
 
             try
             {
-                exportedPath = await sqlBrowserExporter.Export(exportType, model.FileName);
+                var (content, returnedFileName, contentType) = await sqlBrowserExporter.Export(exportType, model.FileName);
+
+                if (content == null || content.Length == 0)
+                {
+                    return Response().AddErrorMessage("Export failed, empty content returned.");
+                }
+
+                var exportDir = sqlBrowserExporter.GetExportDirectory() ?? Path.GetTempPath();
+                Directory.CreateDirectory(exportDir);
+
+                var finalFileName = string.IsNullOrWhiteSpace(returnedFileName)
+                    ? (string.IsNullOrWhiteSpace(model.FileName) ? $"export-{DateTime.Now:yyyy-MM-dd-HH-mm-ss}.{(exportType == SqlBrowserExportType.Excel ? "xlsx" : exportType == SqlBrowserExportType.Json ? "json" : "csv")}" : model.FileName)
+                    : returnedFileName;
+
+                var finalPath = Path.Combine(exportDir, finalFileName);
+                await File.WriteAllBytesAsync(finalPath, content);
+
+                return Response().AddSuccessMessage($"Exported results to {finalPath}");
             }
             catch (Exception ex)
             {
                 eventLogService.LogException(nameof(ResultListing), nameof(Export), ex);
-            }
-
-            if (!string.IsNullOrEmpty(exportedPath))
-            {
-                return Response().AddSuccessMessage($"Exported results to {exportedPath}");
-            }
-            else
-            {
                 return Response().AddErrorMessage("Export failed, please check the Event log for errors");
             }
         }

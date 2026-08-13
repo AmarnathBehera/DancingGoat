@@ -88,8 +88,14 @@ export const EditQuery = (props: EditQueryClientProperties) => {
         fileName: string;
     }
 
-    const { execute: exportQuery } =
-        usePageCommand<string, ExportConfirmationDialogModel>('ExportQuery');
+    interface ExportResult {
+        base64: string;
+        fileName: string;
+        contentType: string;
+    }
+
+    // Use executeCommand from provider to get a promise-based result
+    // const { execute: exportQuery } = usePageCommand<ExportResult | null, ExportConfirmationDialogModel>('ExportQuery');
 
     const exportClick = async () => {
         if (!queryResult || queryResult.rows.length === 0) {
@@ -101,12 +107,71 @@ export const EditQuery = (props: EditQueryClientProperties) => {
             fileName: 'export'
         };
 
-        const result = await exportQuery(model);
+        try {
+            const raw = await executeCommand<ExportResult | null, ExportConfirmationDialogModel>('ExportQuery', model);
 
-        console.log(result);
+            console.log('exportQuery raw result:', raw);
 
-        if (result != null) {
-            notify(`Export created: ${result}`);
+            if (raw == null) {
+                notify('Export failed: no result returned from server.');
+                return;
+            }
+
+            // Normalize wrapper layers commonly used by server frameworks or the admin SDK.
+            let payload: any = raw as any;
+            // Common wrapper property names
+            const unwrapKeys = ['value', 'Value', 'result', 'Result', 'data', 'Data'];
+            for (const k of unwrapKeys) {
+                if (payload && typeof payload === 'object' && k in payload) {
+                    payload = payload[k];
+                }
+            }
+
+            // If the payload is a primitive string, treat it as base64 content (legacy behavior)
+            if (typeof payload === 'string') {
+                const base64 = payload;
+                const fileName = model.fileName ? model.fileName : `export-${Date.now()}.dat`;
+                const contentType = 'application/octet-stream';
+
+                const href = `data:${contentType};base64,${base64}`;
+                const link = document.createElement('a');
+                link.style.display = 'none';
+                link.href = href;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                notify(`Export downloaded: ${fileName}`);
+                return;
+            }
+
+            // If payload is an object, try known property names (support PascalCase from C#)
+            const base64 = payload?.base64 ?? payload?.Base64 ?? payload?.Base64String ?? payload?.content ?? payload?.Content ?? '';
+            const contentType = payload?.contentType ?? payload?.ContentType ?? payload?.content_type ?? 'application/octet-stream';
+            const fileName = payload?.fileName ?? payload?.FileName ?? payload?.filename ?? model.fileName ?? `export-${Date.now()}.dat`;
+
+            if (!base64 || typeof base64 !== 'string' || base64.length === 0) {
+                console.warn('Export payload did not contain base64 content', payload);
+                notify('Export failed: empty content returned from server.');
+                return;
+            }
+
+            const href = `data:${contentType};base64,${base64}`;
+            const link = document.createElement('a');
+            link.style.display = 'none';
+            link.href = href;
+            link.download = fileName;
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            notify(`Export downloaded: ${fileName}`);
+        }
+        catch (ex) {
+            console.error('Export download failed', ex);
+            notify('Export failed: an error occurred. Check console for details.');
         }
     };
     const { execute: saveQuery } =
@@ -479,7 +544,7 @@ return (
                 icon="xp-arrows-v"
             />
 
-            {/* }
+            {/*
             {props.tables.length > 0 && (
                 <DropDownSelectMenu
                     renderTrigger={(ref, onTriggerClick) => (
@@ -504,9 +569,7 @@ return (
                     ))}
                 </DropDownSelectMenu>
             )}
-            */
-               
-            }
+            */}
         </>
     );
   

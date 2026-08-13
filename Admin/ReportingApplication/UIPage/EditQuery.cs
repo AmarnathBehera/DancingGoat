@@ -332,8 +332,10 @@ Use ChannelID = {ReportingChannelSettingId} in your custom query.
 
         // replace current ExportQuery method with this
 
+        public record ExportResult(string Base64, string FileName, string ContentType);
+
         [PageCommand]
-        public async Task<ICommandResponse<string>> ExportQuery(System.Text.Json.JsonElement? rawModel)
+        public async Task<ICommandResponse<ExportResult?>> ExportQuery(System.Text.Json.JsonElement? rawModel)
         {
             try
             {
@@ -352,26 +354,37 @@ Use ChannelID = {ReportingChannelSettingId} in your custom query.
                     _ => SqlBrowserExportType.Csv
                 };
 
-                var fileName = string.IsNullOrWhiteSpace(model?.FileName)
+                var requestedFileName = string.IsNullOrWhiteSpace(model?.FileName)
                     ? $"export-{DateTime.Now:yyyy-MM-dd-HH-mm-ss}.{(exportType == SqlBrowserExportType.Excel ? "xlsx" : exportType == SqlBrowserExportType.Json ? "json" : "csv")}"
                     : model.FileName;
 
-                var exportedPath = await sqlBrowserExporter.Export(exportType, fileName);
+                // Call the interface method with the correct parameter order and get the bytes
+                var (content, returnedFileName, contentType) = await sqlBrowserExporter.Export(exportType, requestedFileName);
 
-                if (!string.IsNullOrEmpty(exportedPath))
+                //if (content == null || content.Length == 0)
+                //{
+                //    return ResponseFrom(string.Empty).AddErrorMessage("Export failed, empty content returned.");
+                //}
+
+                // Prepare export result for browser download (do not write to server disk)
+                if (content == null || content.Length == 0)
                 {
-                    return ResponseFrom(exportedPath).AddSuccessMessage($"Exported results to {exportedPath}");
-                }
-                else
-                {
-                    return ResponseFrom<string>(string.Empty).AddErrorMessage("Export failed, please check the Event log for details.");
+                    return ResponseFrom<ExportResult?>(null).AddErrorMessage("Export failed, empty content returned.");
                 }
 
+                // Prefer the filename returned by exporter if provided
+                var finalFileName = string.IsNullOrWhiteSpace(returnedFileName) ? requestedFileName : returnedFileName;
+
+                var base64 = Convert.ToBase64String(content);
+
+                var exportResult = new ExportResult(base64, finalFileName, contentType);
+
+                return ResponseFrom<ExportResult?>(exportResult).AddSuccessMessage("Export ready for download.");
             }
             catch (Exception ex)
             {
                 eventLogService.LogException(nameof(EditQuery), nameof(ExportQuery), ex);
-                return ResponseFrom<string>(string.Empty);
+                return ResponseFrom<ExportResult?>(null).AddErrorMessage("Export failed, see event log.");
             }
         }
 

@@ -311,7 +311,7 @@ __webpack_require__.r(__webpack_exports__);
 
 // EXPORTS
 __webpack_require__.d(__webpack_exports__, {
-  DownloadExportTableCellComponent: () => (/* reexport */ DownloadExportTableCellComponent),
+  DownloadExportTableCellComponent: () => (/* reexport */ downloadExportTableCellComponent),
   EditQuery: () => (/* reexport */ EditQueryTemplate),
   EditQueryTemplate: () => (/* reexport */ EditQueryTemplate),
   "default": () => (/* reexport */ EditQueryTemplate)
@@ -368,9 +368,9 @@ const EditQuery = props => {
   const {
     execute: notify
   } = (0,xperience_admin_base_.usePageCommand)('Notify');
-  const {
-    execute: exportQuery
-  } = (0,xperience_admin_base_.usePageCommand)('ExportQuery');
+  // Use executeCommand from provider to get a promise-based result
+  // const { execute: exportQuery } = usePageCommand<ExportResult | null, ExportConfirmationDialogModel>('ExportQuery');
+
   const exportClick = async () => {
     if (!queryResult || queryResult.rows.length === 0) {
       return;
@@ -379,10 +379,62 @@ const EditQuery = props => {
       exportType: 'csv',
       fileName: 'export'
     };
-    const result = await exportQuery(model);
-    console.log(result);
-    if (result != null) {
-      notify(`Export created: ${result}`);
+    try {
+      const raw = await executeCommand('ExportQuery', model);
+      console.log('exportQuery raw result:', raw);
+      if (raw == null) {
+        notify('Export failed: no result returned from server.');
+        return;
+      }
+
+      // Normalize wrapper layers commonly used by server frameworks or the admin SDK.
+      let payload = raw;
+      // Common wrapper property names
+      const unwrapKeys = ['value', 'Value', 'result', 'Result', 'data', 'Data'];
+      for (const k of unwrapKeys) {
+        if (payload && typeof payload === 'object' && k in payload) {
+          payload = payload[k];
+        }
+      }
+
+      // If the payload is a primitive string, treat it as base64 content (legacy behavior)
+      if (typeof payload === 'string') {
+        const base64 = payload;
+        const fileName = model.fileName ? model.fileName : `export-${Date.now()}.dat`;
+        const contentType = 'application/octet-stream';
+        const href = `data:${contentType};base64,${base64}`;
+        const link = document.createElement('a');
+        link.style.display = 'none';
+        link.href = href;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        notify(`Export downloaded: ${fileName}`);
+        return;
+      }
+
+      // If payload is an object, try known property names (support PascalCase from C#)
+      const base64 = payload?.base64 ?? payload?.Base64 ?? payload?.Base64String ?? payload?.content ?? payload?.Content ?? '';
+      const contentType = payload?.contentType ?? payload?.ContentType ?? payload?.content_type ?? 'application/octet-stream';
+      const fileName = payload?.fileName ?? payload?.FileName ?? payload?.filename ?? model.fileName ?? `export-${Date.now()}.dat`;
+      if (!base64 || typeof base64 !== 'string' || base64.length === 0) {
+        console.warn('Export payload did not contain base64 content', payload);
+        notify('Export failed: empty content returned from server.');
+        return;
+      }
+      const href = `data:${contentType};base64,${base64}`;
+      const link = document.createElement('a');
+      link.style.display = 'none';
+      link.href = href;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      notify(`Export downloaded: ${fileName}`);
+    } catch (ex) {
+      console.error('Export download failed', ex);
+      notify('Export failed: an error occurred. Check console for details.');
     }
   };
   const {
@@ -727,34 +779,77 @@ const DownloadExportTableCellComponent = props => {
   const {
     executeCommand
   } = (0,xperience_admin_base_.usePageCommandProvider)();
+  const [isLoading, setIsLoading] = (0,external_react_.useState)(false);
+  const [error, setError] = (0,external_react_.useState)(null);
 
   /**
-   * Click handler for export download button.
+   * Determines the MIME type based on file extension
+   */
+  const getMimeType = fileName => {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    const mimeTypes = {
+      'csv': 'text/csv',
+      'json': 'application/json',
+      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'xls': 'application/vnd.ms-excel',
+      'pdf': 'application/pdf',
+      'txt': 'text/plain',
+      'xml': 'application/xml'
+    };
+    return mimeTypes[ext || ''] || 'application/octet-stream';
+  };
+
+  /**
+   * Click handler for export download button with loading state and error handling
    */
   const handleExportDownload = (0,external_react_.useCallback)(async () => {
-    const base64 = await executeCommand("GetBase64String", props.fileName);
+    try {
+      setIsLoading(true);
+      setError(null);
 
-    // Determine MIME type from extension
-    const ext = props.fileName.split('.').pop()?.toLowerCase();
-    let mime = 'application/octet-stream';
-    if (ext === 'csv') mime = 'text/csv';else if (ext === 'json') mime = 'application/json';else if (ext === 'xlsx') mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-    const href = `data:${mime};base64,${base64}`;
-    const link = document.createElement('a');
-    link.style.display = 'none';
-    link.href = href;
-    link.download = props.fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      // Fetch Base64 encoded file content
+      const base64 = await executeCommand("GetBase64String", props.fileName);
+      if (!base64) {
+        throw new Error('Failed to retrieve file content');
+      }
+
+      // Get appropriate MIME type
+      const mime = getMimeType(props.fileName);
+
+      // Create download link and trigger download
+      const href = `data:${mime};base64,${base64}`;
+      const link = document.createElement('a');
+      link.style.display = 'none';
+      link.href = href;
+      link.download = props.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Optional: Log successful download
+      console.log(`File downloaded successfully: ${props.fileName}`);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to download file. Please try again.';
+      setError(errorMessage);
+      console.error('Download error:', err);
+
+      // Optional: Show error to user (you might want to use a toast/notification component)
+      alert(`Error: ${errorMessage}`);
+    } finally {
+      setIsLoading(false);
+    }
   }, [props.fileName, executeCommand]);
   return /*#__PURE__*/(0,jsx_runtime.jsx)(xperience_admin_components_.Button, {
     icon: "xp-arrow-down-line",
     color: xperience_admin_components_.ButtonColor.Quinary,
     size: xperience_admin_components_.ButtonSize.S,
     borderless: true,
+    disabled: isLoading,
+    title: isLoading ? 'Downloading...' : 'Download export file',
     onClick: () => handleExportDownload()
   });
 };
+/* harmony default export */ const downloadExportTableCellComponent = (DownloadExportTableCellComponent);
 ;// ./src/EditQueryTemplate.tsx
 
 ;// ./src/entry.tsx

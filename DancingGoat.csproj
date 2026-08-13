@@ -9,9 +9,13 @@
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Admin\CustomApplication\**" />
     <Compile Remove="Admin\SQLBrowser\**" />
+    <Content Remove="Admin\CustomApplication\**" />
     <Content Remove="Admin\SQLBrowser\**" />
+    <EmbeddedResource Remove="Admin\CustomApplication\**" />
     <EmbeddedResource Remove="Admin\SQLBrowser\**" />
+    <None Remove="Admin\CustomApplication\**" />
     <None Remove="Admin\SQLBrowser\**" />
   </ItemGroup>
   <ItemGroup>
